@@ -23,13 +23,24 @@ cloudinary.config({
  */
 export async function uploadToCloudinary(fileUri, options = {}) {
   try {
+    const hasSecret = !!process.env.CLOUDINARY_API_SECRET;
+    const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || 'umeed_auto';
+
     const uploadOptions = {
       folder: 'umeed_uploads',
       resource_type: 'auto',
       ...options,
     };
     
-    const result = await cloudinary.uploader.upload(fileUri, uploadOptions);
+    let result;
+    if (hasSecret) {
+      // 1. Signed upload (uses API key and secret)
+      result = await cloudinary.uploader.upload(fileUri, uploadOptions);
+    } else {
+      // 2. Unsigned upload (uses upload preset, no credentials required)
+      result = await cloudinary.uploader.unsigned_upload(fileUri, uploadPreset, uploadOptions);
+    }
+    
     return { success: true, data: result };
   } catch (error) {
     console.error('Cloudinary Upload Error:', error);

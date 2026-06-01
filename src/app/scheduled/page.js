@@ -7,6 +7,12 @@ import PostCard from '@/components/PostCard';
 export default function ScheduledPage() {
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -14,13 +20,16 @@ export default function ScheduledPage() {
       const data = await res.json();
       if (res.ok) {
         setPosts(data.posts);
+      } else {
+        showToast('Failed to load scheduled posts', 'error');
       }
     } catch (err) {
       console.error('Failed to fetch posts:', err);
+      showToast('Error loading scheduled posts', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     fetchPosts();
@@ -56,8 +65,17 @@ export default function ScheduledPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }} id="posts-list">
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} onCancel={handleCancel} />
+            <PostCard key={post.id} post={post} onCancel={handleCancel} showToast={showToast} />
           ))}
+        </div>
+      )}
+
+      {/* Toast Overlay */}
+      {toast && (
+        <div className="toast-container">
+          <div className={`toast toast-${toast.type}`} id="toast">
+            {toast.message}
+          </div>
         </div>
       )}
     </>

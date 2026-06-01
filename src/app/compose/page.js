@@ -14,11 +14,49 @@ export default function ComposePage() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [toast, setToast] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [captionError, setCaptionError] = useState('');
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const handleGenerateCaption = async () => {
+    if (!imageUrl) {
+      setCaptionError('Upload an image first to generate a caption');
+      showToast('Upload an image first', 'error');
+      return;
+    }
+
+    setIsGenerating(true);
+    setCaptionError('');
+    showToast('Generating trendy caption with Gemini...', 'success');
+
+    try {
+      const res = await fetch('/api/caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl, context: caption }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setCaption(data.caption);
+        showToast('Caption generated successfully!', 'success');
+      } else {
+        setCaptionError(data.error || 'Failed to generate caption');
+        showToast('Failed to generate caption', 'error');
+      }
+    } catch (err) {
+      setCaptionError('An error occurred during generation');
+      showToast('Failed to generate caption', 'error');
+      console.error('Caption generation error:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handlePublish = async () => {
     // Validation
@@ -36,6 +74,10 @@ export default function ComposePage() {
     }
 
     setIsPublishing(true);
+    showToast(
+      mode === 'scheduled' ? 'Scheduling post...' : 'Publishing post...',
+      'success'
+    );
     try {
       const res = await fetch('/api/posts', {
         method: 'POST',
@@ -86,7 +128,7 @@ export default function ComposePage() {
       {/* Image Upload */}
       <div className="compose-section">
         <label className="compose-label">Media</label>
-        <ImageUploader imageUrl={imageUrl} onImageChange={setImageUrl} />
+        <ImageUploader imageUrl={imageUrl} onImageChange={setImageUrl} showToast={showToast} />
       </div>
 
       {/* Caption */}
@@ -108,12 +150,27 @@ export default function ComposePage() {
             <button
               className="ai-generate-btn"
               id="ai-generate-btn"
-              onClick={() => showToast('AI generation coming soon', 'success')}
+              onClick={handleGenerateCaption}
+              disabled={isGenerating}
             >
-              <Sparkles size={14} />
-              Generate
+              {isGenerating ? (
+                <>
+                  <Loader size={14} className="spinner" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} />
+                  Generate
+                </>
+              )}
             </button>
           </div>
+          {captionError && (
+            <p className="caption-error-text" id="caption-error" style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '6px' }}>
+              {captionError}
+            </p>
+          )}
         </div>
       </div>
 

@@ -21,20 +21,28 @@ const PLATFORM_NAMES = {
   facebook: 'Facebook',
 };
 
-export default function PostCard({ post, onCancel }) {
+export default function PostCard({ post, onCancel, showToast }) {
   const [isCancelling, setIsCancelling] = useState(false);
 
   const handleCancel = async () => {
     setIsCancelling(true);
+    if (showToast) showToast('Cancelling scheduled post...', 'success');
+    
     try {
       const res = await fetch(`/api/posts/${post.id}`, {
         method: 'DELETE',
       });
+      
+      const data = await res.json();
       if (res.ok) {
         onCancel(post.id);
+        if (showToast) showToast('Post cancelled successfully!', 'success');
+      } else {
+        if (showToast) showToast(data.error || 'Failed to cancel post', 'error');
       }
     } catch (err) {
       console.error('Cancel error:', err);
+      if (showToast) showToast('An error occurred while cancelling the post', 'error');
     } finally {
       setIsCancelling(false);
     }

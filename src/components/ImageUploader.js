@@ -3,15 +3,20 @@
 import { useState, useRef, useCallback } from 'react';
 import { ImagePlus, X, Loader } from 'lucide-react';
 
-export default function ImageUploader({ imageUrl, onImageChange }) {
+export default function ImageUploader({ imageUrl, onImageChange, showToast }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleUpload = useCallback(async (file) => {
-    if (!file || !file.type.startsWith('image/')) return;
+    if (!file || !file.type.startsWith('image/')) {
+      if (showToast) showToast('Please select a valid image file', 'error');
+      return;
+    }
 
     setIsUploading(true);
+    if (showToast) showToast('Uploading image...', 'success');
+
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -24,15 +29,18 @@ export default function ImageUploader({ imageUrl, onImageChange }) {
       const data = await res.json();
       if (res.ok && data.url) {
         onImageChange(data.url);
+        if (showToast) showToast('Image uploaded successfully!', 'success');
       } else {
         console.error('Upload failed:', data.error);
+        if (showToast) showToast(data.error || 'Failed to upload image', 'error');
       }
     } catch (err) {
       console.error('Upload error:', err);
+      if (showToast) showToast('An error occurred during upload', 'error');
     } finally {
       setIsUploading(false);
     }
-  }, [onImageChange]);
+  }, [onImageChange, showToast]);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
@@ -61,7 +69,8 @@ export default function ImageUploader({ imageUrl, onImageChange }) {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [onImageChange]);
+    if (showToast) showToast('Image removed', 'success');
+  }, [onImageChange, showToast]);
 
   if (isUploading) {
     return (
