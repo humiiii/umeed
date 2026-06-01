@@ -1,8 +1,16 @@
 import "./globals.css";
+import { Geist } from "next/font/google";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import Navbar from "@/components/Navbar";
+
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist-sans",
+});
 
 export const metadata = {
   title: "Umeed",
-  description: "Sparking Hope • Empowering Tech",
+  description: "Personal social media posting tool",
 };
 
 export const viewport = {
@@ -12,14 +20,14 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className="h-full dark" style={{ colorScheme: 'dark' }}>
-      <body className="min-h-full flex flex-col bg-[#09090b] text-[#f4f4f5] antialiased">
-        {/* Ambient top glowing mesh */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[450px] bg-gradient-to-b from-[#8b5cf6]/5 via-transparent to-transparent blur-[120px] pointer-events-none z-0" />
-        
-        <main className="flex-grow flex flex-col justify-center z-10 relative">
-          {children}
-        </main>
+    <html lang="en" data-theme="dark" className={geist.variable} suppressHydrationWarning>
+      <body className="app-shell">
+        <ThemeProvider>
+          <Navbar />
+          <main className="page-container">
+            {children}
+          </main>
+        </ThemeProvider>
       </body>
     </html>
   );
