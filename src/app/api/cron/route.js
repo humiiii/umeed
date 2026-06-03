@@ -1,17 +1,17 @@
 import { db } from '@/lib/db';
-import { postInstagram } from '@/lib/platforms/instagram';
-import { postLinkedIn } from '@/lib/platforms/linkedin';
-import { postFacebook } from '@/lib/platforms/facebook';
+import { postToZernio } from '@/lib/platforms/zernio';
 
 export async function GET(request) {
   try {
     // 1. Guard check: secure the endpoint against external calls
     const cronSecret = process.env.CRON_SECRET;
-    const incomingSecret = request.headers.get('x-cron-secret');
+    const authHeader = request.headers.get('authorization');
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const incomingSecret = request.headers.get('x-cron-secret') || bearerToken;
 
     if (!cronSecret || incomingSecret !== cronSecret) {
       return Response.json(
-        { error: 'Unauthorized: Missing or invalid x-cron-secret header verification.' },
+        { error: 'Unauthorized: Missing or invalid x-cron-secret or Authorization Bearer header.' },
         { status: 401 }
       );
     }
@@ -37,32 +37,9 @@ export async function GET(request) {
       const imageUrl = post.image_url;
       const caption = post.caption;
 
-      const promises = [];
-      const platformKeys = [];
+      const platformsArray = Array.isArray(platforms) ? platforms : [];
 
-      const hasPlatform = (platformName) => {
-        if (Array.isArray(platforms)) {
-          return platforms.includes(platformName);
-        }
-        return false;
-      };
-
-      // Populate promises for each configured target network
-      if (hasPlatform('instagram')) {
-        promises.push(postInstagram({ imageUrl, caption }));
-        platformKeys.push('instagram');
-      }
-      if (hasPlatform('linkedin')) {
-        promises.push(postLinkedIn({ imageUrl, caption }));
-        platformKeys.push('linkedin');
-      }
-      if (hasPlatform('facebook')) {
-        promises.push(postFacebook({ imageUrl, caption }));
-        platformKeys.push('facebook');
-      }
-
-      if (promises.length === 0) {
-        // Safe check: If no platforms were configured, auto-resolve to avoid queue blocking
+      if (platformsArray.length === 0) {
         await db(
           "UPDATE scheduled_posts SET status = 'published' WHERE id = $1",
           [post.id]
@@ -70,32 +47,36 @@ export async function GET(request) {
         processedResults.push({
           id: post.id,
           status: 'published',
-          details: 'Skipped: No valid platforms were selected.'
+          details: 'Skipped: No platforms were selected.'
         });
         continue;
       }
 
-      // Execute platform publishing calls in parallel
-      const settled = await Promise.allSettled(promises);
-      const failures = settled.filter((s) => s.status === 'rejected');
+      try {
+        await postToZernio({ imageUrl, caption, platforms: platformsArray });
 
-      // If any of the target platforms fail, mark the post status as failed
-      const finalStatus = failures.length === 0 ? 'published' : 'failed';
+        await db(
+          "UPDATE scheduled_posts SET status = 'published' WHERE id = $1",
+          [post.id]
+        );
 
-      await db(
-        "UPDATE scheduled_posts SET status = $1 WHERE id = $2",
-        [finalStatus, post.id]
-      );
+        processedResults.push({
+          id: post.id,
+          status: 'published',
+          details: `Published via Zernio to: ${platformsArray.join(', ')}`
+        });
+      } catch (err) {
+        await db(
+          "UPDATE scheduled_posts SET status = 'failed' WHERE id = $1",
+          [post.id]
+        );
 
-      processedResults.push({
-        id: post.id,
-        status: finalStatus,
-        details: settled.map((s, idx) => ({
-          platform: platformKeys[idx],
-          status: s.status,
-          error: s.status === 'rejected' ? s.reason?.message || String(s.reason) : undefined,
-        }))
-      });
+        processedResults.push({
+          id: post.id,
+          status: 'failed',
+          details: err.message || 'Failed to publish via Zernio'
+        });
+      }
     }
 
     return Response.json({

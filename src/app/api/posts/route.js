@@ -1,7 +1,5 @@
 import { db } from '@/lib/db';
-import { postInstagram } from '@/lib/platforms/instagram';
-import { postLinkedIn } from '@/lib/platforms/linkedin';
-import { postFacebook } from '@/lib/platforms/facebook';
+import { postToZernio } from '@/lib/platforms/zernio';
 
 /**
  * Normalizes user-submitted platforms data into a clean array of strings.
@@ -14,11 +12,8 @@ function getPlatformsArray(platforms) {
   }
   if (platforms && typeof platforms === 'object') {
     const arr = [];
-    if (platforms.instagram) arr.push('instagram');
     if (platforms.linkedin) arr.push('linkedin');
     if (platforms.facebook) arr.push('facebook');
-    // Keep 'twitter'/'x' if present in existing structure
-    if (platforms.twitter || platforms.x) arr.push('twitter');
     return arr;
   }
   return [];
@@ -76,42 +71,21 @@ export async function POST(request) {
     const isImmediate = !scheduledAt;
 
     if (isImmediate) {
-      // 1. Post Now Mode
-      const promises = [];
-      const platformKeys = [];
-
-      if (platformsArray.includes('instagram')) {
-        promises.push(postInstagram({ imageUrl, caption }));
-        platformKeys.push('instagram');
-      }
-      if (platformsArray.includes('linkedin')) {
-        promises.push(postLinkedIn({ imageUrl, caption }));
-        platformKeys.push('linkedin');
-      }
-      if (platformsArray.includes('facebook')) {
-        promises.push(postFacebook({ imageUrl, caption }));
-        platformKeys.push('facebook');
-      }
-
-      if (promises.length === 0) {
+      // 1. Post Now Mode (via Zernio)
+      try {
+        const result = await postToZernio({ imageUrl, caption, platforms: platformsArray });
+        const results = platformsArray.map(platform => ({
+          platform,
+          status: 'fulfilled',
+          value: result
+        }));
+        return Response.json({ success: true, results }, { status: 200 });
+      } catch (err) {
         return Response.json(
-          { error: 'No supported active platforms chosen for immediate publishing' },
-          { status: 400 }
+          { error: err.message || 'Failed to publish via Zernio' },
+          { status: 500 }
         );
       }
-
-      // Execute in parallel
-      const settledResults = await Promise.allSettled(promises);
-      const results = settledResults.map((res, index) => {
-        const platform = platformKeys[index];
-        if (res.status === 'fulfilled') {
-          return { platform, status: 'fulfilled', value: res.value };
-        } else {
-          return { platform, status: 'rejected', error: res.reason?.message || String(res.reason) };
-        }
-      });
-
-      return Response.json({ success: true, results }, { status: 200 });
     } else {
       // 2. Schedule Mode
       const id = crypto.randomUUID();
