@@ -1,11 +1,13 @@
 'use client';
 
 export default function ScheduleControl({ mode, onModeChange, scheduledAt, onScheduledAtChange }) {
-  // Get minimum datetime (now + 5 minutes)
+  // Get minimum datetime (now + 5 minutes) in local timezone
   const getMinDateTime = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 5);
-    return now.toISOString().slice(0, 16);
+    const offset = now.getTimezoneOffset();
+    const localNow = new Date(now.getTime() - offset * 60 * 1000);
+    return localNow.toISOString().slice(0, 16);
   };
 
   return (

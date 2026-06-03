@@ -86,7 +86,7 @@ export default function ComposePage() {
           caption,
           imageUrl,
           platforms,
-          scheduledAt: mode === 'scheduled' ? scheduledAt : null,
+          scheduledAt: mode === 'scheduled' ? new Date(scheduledAt).toISOString() : null,
           mode,
         }),
       });
