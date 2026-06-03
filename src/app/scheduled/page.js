@@ -39,13 +39,15 @@ export default function ScheduledPage() {
     setPosts((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
+  const queuedCount = posts.filter((p) => (p.status || 'pending') === 'pending').length;
+
   return (
     <>
       <div className="page-header">
         <h1 className="page-title" id="scheduled-title">Scheduled</h1>
         <p className="page-subtitle">
-          {posts.length > 0
-            ? `${posts.length} post${posts.length !== 1 ? 's' : ''} queued`
+          {queuedCount > 0
+            ? `${queuedCount} post${queuedCount !== 1 ? 's' : ''} queued`
             : 'Your queued posts will appear here'}
         </p>
       </div>
