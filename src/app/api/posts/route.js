@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { postToZernio } from '@/lib/platforms/zernio';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Normalizes user-submitted platforms data into a clean array of strings.
  * Supports both array format: ['instagram', 'facebook']

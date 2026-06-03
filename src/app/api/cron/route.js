@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { postToZernio } from '@/lib/platforms/zernio';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     // 1. Guard check: secure the endpoint against external calls
