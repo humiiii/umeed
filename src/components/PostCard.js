@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Clock, Loader } from 'lucide-react';
+import { X, Clock, Loader, CheckCircle2, AlertCircle } from 'lucide-react';
 
 function formatDate(dateStr) {
   const date = new Date(dateStr);
@@ -21,32 +21,60 @@ const PLATFORM_NAMES = {
   facebook: 'Facebook',
 };
 
-export default function PostCard({ post, onCancel, showToast }) {
-  const [isCancelling, setIsCancelling] = useState(false);
+const STATUS_CONFIG = {
+  pending: {
+    label: 'Scheduled',
+    color: 'var(--text-secondary)',
+    bg: 'var(--bg-secondary)',
+    icon: Clock,
+  },
+  published: {
+    label: 'Published',
+    color: 'var(--accent)',
+    bg: 'var(--accent-subtle)',
+    icon: CheckCircle2,
+  },
+  failed: {
+    label: 'Failed',
+    color: 'var(--danger)',
+    bg: 'var(--danger-subtle)',
+    icon: AlertCircle,
+  },
+};
 
-  const handleCancel = async () => {
-    setIsCancelling(true);
-    if (showToast) showToast('Cancelling scheduled post...', 'success');
+export default function PostCard({ post, onCancel, showToast }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    const actionLabel = post.status === 'pending' ? 'Cancelling' : 'Clearing';
+    const successLabel = post.status === 'pending' ? 'Post cancelled' : 'Post cleared';
+    
+    if (showToast) showToast(`${actionLabel} post...`, 'success');
     
     try {
       const res = await fetch(`/api/posts/${post.id}`, {
         method: 'DELETE',
       });
       
-      const data = await res.json();
       if (res.ok) {
         onCancel(post.id);
-        if (showToast) showToast('Post cancelled successfully!', 'success');
+        if (showToast) showToast(`${successLabel} successfully!`, 'success');
       } else {
-        if (showToast) showToast(data.error || 'Failed to cancel post', 'error');
+        const data = await res.json();
+        if (showToast) showToast(data.error || 'Failed to complete action', 'error');
       }
     } catch (err) {
-      console.error('Cancel error:', err);
-      if (showToast) showToast('An error occurred while cancelling the post', 'error');
+      console.error('Delete error:', err);
+      if (showToast) showToast('An error occurred. Please try again.', 'error');
     } finally {
-      setIsCancelling(false);
+      setIsDeleting(false);
     }
   };
+
+  const status = post.status || 'pending';
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+  const StatusIcon = config.icon;
 
   return (
     <div className="post-card" id={`post-card-${post.id}`}>
@@ -66,6 +94,22 @@ export default function PostCard({ post, onCancel, showToast }) {
         )}
 
         <div className="post-card-meta">
+          {/* Status Badge */}
+          <span
+            className="post-card-platform-badge"
+            style={{
+              color: config.color,
+              backgroundColor: config.bg,
+              border: `1px solid ${config.color}15`,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <StatusIcon size={11} />
+            {config.label}
+          </span>
+
           {/* Platform badges */}
           {post.platforms.map((p) => (
             <span key={p} className="post-card-platform-badge">
@@ -83,23 +127,39 @@ export default function PostCard({ post, onCancel, showToast }) {
         </div>
       </div>
 
-      {/* Cancel button */}
+      {/* Action Button */}
       <div className="post-card-actions">
-        <button
-          className="btn btn-danger btn-sm"
-          onClick={handleCancel}
-          disabled={isCancelling}
-          id={`cancel-post-${post.id}`}
-        >
-          {isCancelling ? (
-            <Loader size={12} className="spinner" />
-          ) : (
-            <>
-              <X size={12} />
-              Cancel
-            </>
-          )}
-        </button>
+        {status === 'published' ? (
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            id={`delete-post-${post.id}`}
+            style={{ fontSize: '11px', padding: '4px 8px' }}
+          >
+            {isDeleting ? (
+              <Loader size={12} className="spinner" />
+            ) : (
+              'Clear'
+            )}
+          </button>
+        ) : (
+          <button
+            className="btn btn-danger btn-sm"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            id={`cancel-post-${post.id}`}
+          >
+            {isDeleting ? (
+              <Loader size={12} className="spinner" />
+            ) : (
+              <>
+                <X size={12} />
+                {status === 'failed' ? 'Clear' : 'Cancel'}
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
